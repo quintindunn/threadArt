@@ -27,5 +27,10 @@ setup(name='threadArt',
           'Operating System :: Microsoft :: Windows :: Windows 10',
           'Programming Language :: Python :: 3',
       ],
-      install_requires=requirements
+      install_requires=[
+          "pillow",
+          "numpy",
+          "scikit-image",
+          "opencv-python"
+      ]
       )
