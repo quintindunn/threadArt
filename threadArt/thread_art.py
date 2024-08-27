@@ -43,6 +43,18 @@ def _preprocess_image(img: str | os.PathLike | Image.Image, size: tuple[int, int
 
 def process_image(im: Image.Image, board_width: int, pixel_width: int, nail_count: int, max_strings: int,
                   nails_skip: int, visualize: bool = False, progress: int = 200) -> tuple[list[int], Image.Image]:
+    """
+    Generates the string art representation of the image.
+    :param im: Pillow Image to convert to string art.
+    :param board_width: The width of the board.
+    :param pixel_width: The line width.
+    :param nail_count: Number of points around the board to lock onto.
+    :param max_strings: The number of strings to draw.
+    :param nails_skip: How many neighbors to skip when finding the next nail.
+    :param visualize: Whether to show the visualizer.
+    :param progress: Whether to have progress reports on, (Shown on logger level logging.INFO).
+    :return:
+    """
     pixels = int(board_width / pixel_width)
     size = (pixels + 1, pixels + 1)
 
