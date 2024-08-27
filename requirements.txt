@@ -1,4 +1,0 @@
-pillow
-numpy
-scikit-image
-opencv-python

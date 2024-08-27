@@ -6,9 +6,6 @@ DESCRIPTION = "A python module for generating thread art sequences."
 with open("README.md", 'r') as f:
     LONG_DESCRIPTION = f.read()
 
-with open("requirements.txt", 'r', encoding="utf-8") as f:
-    requirements = [i.strip() for i in f.readlines()]
-
 LICENSE = "MIT"
 
 setup(name='threadArt',
