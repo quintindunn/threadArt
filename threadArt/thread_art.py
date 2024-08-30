@@ -1,4 +1,7 @@
-from .visualizer import StringVisualizer
+try:
+    from .visualizer import StringVisualizer
+except ImportError:
+    from visualizer import StringVisualizer
 
 import numpy as np
 import cv2
@@ -14,7 +17,7 @@ CREDIT: https://github.com/halfmonty/StringArtGenerator/blob/master/main.go
 
 
 class HalfmontyAlgorithm:
-    def __init__(self, im: str, pin_count: int, min_distance: int, max_lines: int, line_weight: int,
+    def __init__(self, im: np.ndarray, pin_count: int, min_distance: int, max_lines: int, line_weight: int,
                  img_size: int, use_visualizer):
         self.im = im
 
@@ -37,8 +40,9 @@ class HalfmontyAlgorithm:
             self.visualizer.generate_nails(live_delay=10)
 
     def import_picture_and_get_pixel_array(self) -> np.ndarray:
-        img = cv2.resize(self.im, (self.img_size, self.img_size))
-        return img.flatten().astype(np.float64)
+        cv2.cvtColor(self.im, cv2.COLOR_BGR2GRAY)
+        im = cv2.resize(self.im, (self.img_size, self.img_size))
+        return im.flatten().astype(np.float64)
 
     def calculate_pin_coords(self):
         center = self.img_size / 2
@@ -146,7 +150,7 @@ if __name__ == "__main__":
         max_lines=MAX_LINES,
         line_weight=LINE_WEIGHT,
         img_size=IMG_SIZE,
-        use_visualizer=False
+        use_visualizer=True
     )
     art.run()
 
