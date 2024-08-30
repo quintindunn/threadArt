@@ -1,3 +1,5 @@
+from visualizer import StringVisualizer
+
 import numpy as np
 import cv2
 import math
@@ -8,120 +10,140 @@ CREDIT: https://github.com/halfmonty/StringArtGenerator/blob/master/main.go
 """
 
 
-# Constants
-PINS = 300
-MIN_DISTANCE = 30
-MAX_LINES = 4000
-LINE_WEIGHT = 8
-IMG_SIZE = 500
+class HalfmontyAlgorithm:
+    def __init__(self, im_path: str, pin_count: int, min_distance: int, max_lines: int, line_weight: int,
+                 img_size: int, use_visualizer):
+        self.im_path = im_path
 
-# Globals
-Pin_coords = []
-SourceImage = []
-Line_cache_y = []
-Line_cache_x = []
+        self.pins = pin_count
+        self.min_distance = min_distance
+        self.max_lines = max_lines
+        self.line_weight = line_weight
+        self.img_size = img_size
 
+        self.pin_coords = []
+        self.source_im = []
+        self.line_cache_y = []
+        self.line_cache_x = []
 
-def main():
-    global SourceImage
-    SourceImage = import_picture_and_get_pixel_array("../dog.jpg")
-    print("Hello, world.")
+        self.sequence = []
 
-    start_time = time.time()
-    calculate_pin_coords()
-    precalculate_all_potential_lines()
-    calculate_lines()
-    end_time = time.time()
-    diff = end_time - start_time
-    print(f"precalculateAllPotentialLines Taken: {diff:.6f} seconds")
+        self.visualizer = None
+        if use_visualizer:
+            self.visualizer = StringVisualizer(nail_count=self.pins, diameter=1024*2)
+            self.visualizer.generate_nails(live_delay=10)
 
-    print("End")
+    def import_picture_and_get_pixel_array(self):
+        img = cv2.imread(self.im_path, cv2.IMREAD_GRAYSCALE)
+        img = cv2.resize(img, (self.img_size, self.img_size))
+        return img.flatten().astype(np.float64)
 
+    def calculate_pin_coords(self):
+        center = self.img_size / 2
+        radius = self.img_size / 2 - 1
 
-def import_picture_and_get_pixel_array(image_path):
-    img = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
-    img = cv2.resize(img, (IMG_SIZE, IMG_SIZE))
-    return img.flatten().astype(np.float64)
+        self.pin_coords = [
+            (math.floor(center + radius * math.cos(2 * math.pi * i / self.pins)),
+             math.floor(center + radius * math.sin(2 * math.pi * i / self.pins)))
+            for i in range(self.pins)
+        ]
 
+    def precalculate_all_potential_lines(self):
+        self.line_cache_x = [[] for _ in range(self.pins * self.pins)]
+        self.line_cache_y = [[] for _ in range(self.pins * self.pins)]
 
-def calculate_pin_coords():
-    global Pin_coords
-    center = IMG_SIZE / 2
-    radius = IMG_SIZE / 2 - 1
+        for i in range(self.pins):
+            for j in range(i + self.min_distance, self.pins):
+                x0, y0 = self.pin_coords[i]
+                x1, y1 = self.pin_coords[j]
 
-    Pin_coords = [
-        (math.floor(center + radius * math.cos(2 * math.pi * i / PINS)),
-         math.floor(center + radius * math.sin(2 * math.pi * i / PINS)))
-        for i in range(PINS)
-    ]
+                d = math.floor(math.sqrt((x1 - x0) ** 2 + (y1 - y0) ** 2))
+                xs = np.round(np.linspace(x0, x1, int(d))).astype(int)
+                ys = np.round(np.linspace(y0, y1, int(d))).astype(int)
 
+                self.line_cache_y[j * self.pins + i] = ys
+                self.line_cache_y[i * self.pins + j] = ys
+                self.line_cache_x[j * self.pins + i] = xs
+                self.line_cache_x[i * self.pins + j] = xs
 
-def precalculate_all_potential_lines():
-    global Line_cache_y, Line_cache_x
-    Line_cache_y = [[] for _ in range(PINS * PINS)]
-    Line_cache_x = [[] for _ in range(PINS * PINS)]
+    def calculate_line(self):
+        print("Drawing Lines....")
+        error = 255 - self.source_im
 
-    for i in range(PINS):
-        for j in range(i + MIN_DISTANCE, PINS):
-            x0, y0 = Pin_coords[i]
-            x1, y1 = Pin_coords[j]
+        current_pin = 0
+        last_pins = [-1] * 20
 
-            d = math.floor(math.sqrt((x1 - x0) ** 2 + (y1 - y0) ** 2))
-            xs = np.round(np.linspace(x0, x1, int(d))).astype(int)
-            ys = np.round(np.linspace(y0, y1, int(d))).astype(int)
+        for _ in range(self.max_lines):
+            best_pin = -1
+            max_err = 0
+            index = 0
 
-            Line_cache_y[j * PINS + i] = ys
-            Line_cache_y[i * PINS + j] = ys
-            Line_cache_x[j * PINS + i] = xs
-            Line_cache_x[i * PINS + j] = xs
+            for offset in range(self.min_distance, self.pins - self.min_distance):
+                test_pin = (current_pin + offset) % self.pins
+                if test_pin in last_pins:
+                    continue
+                else:
+                    inner_index = test_pin * self.pins + current_pin
 
+                    line_err = self.get_line_err(error, self.line_cache_y[inner_index], self.line_cache_x[inner_index])
+                    if line_err > max_err:
+                        max_err = line_err
+                        best_pin = test_pin
+                        index = inner_index
 
-def calculate_lines():
-    print("Drawing Lines....")
-    error = 255 - SourceImage
+            self.sequence.append(best_pin)
+            if self.visualizer is not None:
+                self.visualizer.add_line(current_pin, best_pin)
+                self.visualizer.update(1)
 
-    line_sequence = []
-    current_pin = 0
-    last_pins = [-1] * 20
-    max_err = 0
+            for i in range(len(self.line_cache_y[index])):
+                v = int(self.line_cache_y[index][i] * self.img_size + self.line_cache_x[index][i])
+                error[v] -= self.line_weight
 
-    for _ in range(MAX_LINES):
-        best_pin = -1
-        line_err = 0
-        max_err = 0
-        index = 0
+            last_pins = last_pins[1:] + [best_pin]
+            current_pin = best_pin
 
-        for offset in range(MIN_DISTANCE, PINS - MIN_DISTANCE):
-            test_pin = (current_pin + offset) % PINS
-            if test_pin in last_pins:
-                continue
-            else:
-                inner_index = test_pin * PINS + current_pin
+        print(self.sequence)
+        return None
 
-                line_err = get_line_err(error, Line_cache_y[inner_index], Line_cache_x[inner_index])
-                if line_err > max_err:
-                    max_err = line_err
-                    best_pin = test_pin
-                    index = inner_index
+    def get_line_err(self, err, coords1, coords2):
+        sum_err = 0
+        for i in range(len(coords1)):
+            sum_err += err[int(coords1[i] * self.img_size + coords2[i])]
+        return sum_err
 
-        line_sequence.append(best_pin)
+    def run(self):
+        self.source_im = self.import_picture_and_get_pixel_array()
 
-        for i in range(len(Line_cache_y[index])):
-            v = int(Line_cache_y[index][i] * IMG_SIZE + Line_cache_x[index][i])
-            error[v] -= LINE_WEIGHT
+        start_time = time.time()
+        self.calculate_pin_coords()
+        self.precalculate_all_potential_lines()
+        while self.calculate_line() is not None:
+            pass
 
-        last_pins = last_pins[1:] + [best_pin]
-        current_pin = best_pin
+        end_time = time.time()
+        print(f"Precalculation: {end_time-start_time:.6f}s")
 
-    print(line_sequence)
-
-
-def get_line_err(err, coords1, coords2):
-    sum_err = 0
-    for i in range(len(coords1)):
-        sum_err += err[int(coords1[i] * IMG_SIZE + coords2[i])]
-    return sum_err
+        print("done!")
 
 
 if __name__ == "__main__":
-    main()
+    PINS = 300
+    MIN_DISTANCE = 30
+    MAX_LINES = 4000
+    LINE_WEIGHT = 8
+    IMG_SIZE = 500
+
+    art = HalfmontyAlgorithm(
+        im_path="../horse.jpg",
+        pin_count=PINS,
+        min_distance=MIN_DISTANCE,
+        max_lines=MAX_LINES,
+        line_weight=LINE_WEIGHT,
+        img_size=IMG_SIZE,
+        use_visualizer=True
+    )
+    art.run()
+
+    with open("../results.txt", 'w') as f:
+        f.write(','.join(map(str, art.sequence)))
