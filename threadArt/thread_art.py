@@ -1,4 +1,4 @@
-from visualizer import StringVisualizer
+from .visualizer import StringVisualizer
 
 import numpy as np
 import cv2
