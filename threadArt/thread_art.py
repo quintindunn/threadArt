@@ -4,6 +4,9 @@ import numpy as np
 import cv2
 import math
 import time
+import logging
+
+logger = logging.getLogger("threadArt")
 
 """
 CREDIT: https://github.com/halfmonty/StringArtGenerator/blob/master/main.go
@@ -11,9 +14,9 @@ CREDIT: https://github.com/halfmonty/StringArtGenerator/blob/master/main.go
 
 
 class HalfmontyAlgorithm:
-    def __init__(self, im_path: str, pin_count: int, min_distance: int, max_lines: int, line_weight: int,
+    def __init__(self, im: str, pin_count: int, min_distance: int, max_lines: int, line_weight: int,
                  img_size: int, use_visualizer):
-        self.im_path = im_path
+        self.im = im
 
         self.pins = pin_count
         self.min_distance = min_distance
@@ -33,9 +36,8 @@ class HalfmontyAlgorithm:
             self.visualizer = StringVisualizer(nail_count=self.pins, diameter=1024*2)
             self.visualizer.generate_nails(live_delay=10)
 
-    def import_picture_and_get_pixel_array(self):
-        img = cv2.imread(self.im_path, cv2.IMREAD_GRAYSCALE)
-        img = cv2.resize(img, (self.img_size, self.img_size))
+    def import_picture_and_get_pixel_array(self) -> np.ndarray:
+        img = cv2.resize(self.im, (self.img_size, self.img_size))
         return img.flatten().astype(np.float64)
 
     def calculate_pin_coords(self):
@@ -47,10 +49,11 @@ class HalfmontyAlgorithm:
              math.floor(center + radius * math.sin(2 * math.pi * i / self.pins)))
             for i in range(self.pins)
         ]
+        logger.info("Calculated pin coords.")
 
     def precalculate_all_potential_lines(self):
-        self.line_cache_x = [[] for _ in range(self.pins * self.pins)]
-        self.line_cache_y = [[] for _ in range(self.pins * self.pins)]
+        self.line_cache_x: list = [[] for _ in range(self.pins * self.pins)]
+        self.line_cache_y: list = [[] for _ in range(self.pins * self.pins)]
 
         for i in range(self.pins):
             for j in range(i + self.min_distance, self.pins):
@@ -67,8 +70,8 @@ class HalfmontyAlgorithm:
                 self.line_cache_x[i * self.pins + j] = xs
 
     def calculate_line(self):
-        print("Drawing Lines....")
-        error = 255 - self.source_im
+        logger.info("Drawing lines.")
+        error = np.subtract(255, self.source_im)
 
         current_pin = 0
         last_pins = [-1] * 20
@@ -103,8 +106,7 @@ class HalfmontyAlgorithm:
             last_pins = last_pins[1:] + [best_pin]
             current_pin = best_pin
 
-        print(self.sequence)
-        return None
+        return self.sequence
 
     def get_line_err(self, err, coords1, coords2):
         sum_err = 0
@@ -112,19 +114,20 @@ class HalfmontyAlgorithm:
             sum_err += err[int(coords1[i] * self.img_size + coords2[i])]
         return sum_err
 
-    def run(self):
+    def run(self) -> list[int]:
         self.source_im = self.import_picture_and_get_pixel_array()
 
         start_time = time.time()
         self.calculate_pin_coords()
         self.precalculate_all_potential_lines()
-        while self.calculate_line() is not None:
-            pass
+        sequence = self.calculate_line()
 
         end_time = time.time()
-        print(f"Precalculation: {end_time-start_time:.6f}s")
 
-        print("done!")
+        logger.info(f"Pre-calculation {end_time-start_time:.6f}s")
+
+        logger.info("Done!")
+        return sequence
 
 
 if __name__ == "__main__":
@@ -134,14 +137,16 @@ if __name__ == "__main__":
     LINE_WEIGHT = 8
     IMG_SIZE = 500
 
+    img = cv2.imread("../horse.jpg")
+
     art = HalfmontyAlgorithm(
-        im_path="../horse.jpg",
+        im=img,
         pin_count=PINS,
         min_distance=MIN_DISTANCE,
         max_lines=MAX_LINES,
         line_weight=LINE_WEIGHT,
         img_size=IMG_SIZE,
-        use_visualizer=True
+        use_visualizer=False
     )
     art.run()
 
