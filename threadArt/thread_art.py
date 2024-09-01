@@ -48,6 +48,8 @@ class KasperMeertsAlgorithm:
         self.line_cache_weight = [1] * n_pins * n_pins  # Turned out to be unnecessary, unused
         self.line_cache_length = [0] * n_pins * n_pins
 
+        self.optimal = None
+
     def preprocess_im(self):
         height, width, _ = self.im.shape
 
@@ -81,7 +83,7 @@ class KasperMeertsAlgorithm:
 
     def precalculate_lines(self):
         for a in range(self.n_pins):
-            for b in range(a + MIN_DISTANCE, self.n_pins):
+            for b in range(a + self.min_distance, self.n_pins):
                 x0 = self.pin_coords[a][0]
                 y0 = self.pin_coords[a][1]
 
@@ -108,7 +110,7 @@ class KasperMeertsAlgorithm:
         length = self.im.shape[0]
 
         result = np.ones((self.im.shape[0] * self.scale, self.im.shape[1] * self.scale), np.uint8) * 0xFF
-        line_mask = np.zeros(self.im.shape, np.float64)  # XXX
+        line_mask = np.zeros(self.im.shape, np.float64)
 
         pin = 0
         self.sequence.append(pin)
@@ -117,7 +119,7 @@ class KasperMeertsAlgorithm:
 
         last_pins = collections.deque(maxlen=self.min_loop)
 
-        for line in range(MAX_LINES):
+        for line in range(self.max_lines):
             if line % 100 == 0:
 
                 img_result = cv.resize(result, self.im.shape, interpolation=cv.INTER_AREA)
@@ -125,13 +127,20 @@ class KasperMeertsAlgorithm:
                 diff = img_result - self.im
                 mul = np.uint8(img_result < self.im) * 254 + 1
                 abs_diff = diff * mul
-                logger.debug(f"Line: {line} - {abs_diff.sum() / (length * length)}")
+                err = abs_diff.sum() / length*length
+
+                if self.optimal is not None:
+                    self.optimal = err, line if err < self.optimal[0] else self.optimal
+                else:
+                    self.optimal = err, line
+
+                logger.debug(f"Line: {line} - {err}")
 
             max_err = -math.inf
             best_pin = -1
 
             # Find the line which will lower the error the most
-            for offset in range(MIN_DISTANCE, self.n_pins - MIN_DISTANCE):
+            for offset in range(self.min_distance, self.n_pins - self.min_distance):
                 test_pin = (pin + offset) % self.n_pins
                 if test_pin in last_pins:
                     continue
@@ -155,7 +164,7 @@ class KasperMeertsAlgorithm:
 
             xs = self.line_cache_x[best_pin * self.n_pins + pin]
             ys = self.line_cache_y[best_pin * self.n_pins + pin]
-            weight = LINE_WEIGHT * self.line_cache_weight[best_pin * self.n_pins + pin]
+            weight = self.line_weight * self.line_cache_weight[best_pin * self.n_pins + pin]
 
             # Subtract the line from the error
             line_mask.fill(0)
@@ -186,11 +195,12 @@ class KasperMeertsAlgorithm:
             last_pins.append(best_pin)
             pin = best_pin
 
-    def run(self):
+    def run(self) -> list[int]:
         self.preprocess_im()
         self.calculate_pin_coords()
         self.precalculate_lines()
         self.calculate_lines()
+        return self.sequence
 
 
 if __name__ == "__main__":
