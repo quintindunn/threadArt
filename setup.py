@@ -1,6 +1,6 @@
 from setuptools import setup, find_packages
 
-VERSION = "1.1.3"
+VERSION = "1.2.0"
 DESCRIPTION = "A python module for generating thread art sequences."
 
 with open("README.md", 'r') as f:
