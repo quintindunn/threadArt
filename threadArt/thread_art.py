@@ -1,4 +1,5 @@
 import collections
+import sys
 
 try:
     from .visualizer import StringVisualizer
@@ -48,13 +49,22 @@ class KasperMeertsAlgorithm:
         self.line_cache_length = [0] * n_pins * n_pins
 
     def preprocess_im(self):
+        height, width, _ = self.im.shape
+
+        square_size = min(width, height)
+
+        left = (width - square_size) // 2
+        top = (height - square_size) // 2
+        right = left + square_size
+        bottom = top + square_size
+
+        self.im = self.im[top:bottom, left:right]
+
         self.im = cv.cvtColor(self.im, cv.COLOR_BGR2GRAY)
 
-        shape = [min(self.im.shape)] * 2
-        self.im = cv.resize(self.im, shape)
         assert self.im.shape[0] == self.im.shape[1]
 
-        length = shape[0]
+        length = self.im.shape[0]
 
         x, y = np.ogrid[0:length, 0:length]
         circle_mask = (x - length / 2) ** 2 + (y - length / 2) ** 2 > length / 2 * length / 2
@@ -107,16 +117,15 @@ class KasperMeertsAlgorithm:
 
         last_pins = collections.deque(maxlen=self.min_loop)
 
-        for l in range(MAX_LINES):
-
-            if l % 100 == 0:
+        for line in range(MAX_LINES):
+            if line % 100 == 0:
 
                 img_result = cv.resize(result, self.im.shape, interpolation=cv.INTER_AREA)
 
                 diff = img_result - self.im
                 mul = np.uint8(img_result < self.im) * 254 + 1
-                absdiff = diff * mul
-                logger.debug(f"Line: {l} - {absdiff.sum() / (length * length)}")
+                abs_diff = diff * mul
+                logger.debug(f"Line: {line} - {abs_diff.sum() / (length * length)}")
 
             max_err = -math.inf
             best_pin = -1
@@ -160,9 +169,9 @@ class KasperMeertsAlgorithm:
             self.pin_coords[best_pin][0]: np.ndarray
             self.pin_coords[best_pin][1]: np.ndarray
 
-            pt1: tuple[int, int] = self.pin_coords[pin][0] * self.scale, self.pin_coords[pin][1] * self.scale
-            pt2: tuple[int, int] = self.pin_coords[best_pin][0] * self.scale, self.pin_coords[best_pin][1] * self.scale
-            cv.line(result, pt1, pt2, color=0, thickness=4, lineType=8)
+            pt1 = self.pin_coords[pin][0] * self.scale, self.pin_coords[pin][1] * self.scale
+            pt2 = self.pin_coords[best_pin][0] * self.scale, self.pin_coords[best_pin][1] * self.scale
+            cv.line(result, pt1, pt2, color=(0, 0, 0), thickness=4, lineType=8)
 
             x0 = self.pin_coords[pin][0]
             y0 = self.pin_coords[pin][1]
@@ -185,6 +194,7 @@ class KasperMeertsAlgorithm:
 
 
 if __name__ == "__main__":
+    logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
     PINS = 300
     MIN_DISTANCE = 30
     MAX_LINES = 4000
