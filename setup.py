@@ -1,6 +1,6 @@
 from setuptools import setup, find_packages
 
-VERSION = "1.1.2"
+VERSION = "1.2.0"
 DESCRIPTION = "A python module for generating thread art sequences."
 
 with open("README.md", 'r') as f:
@@ -25,9 +25,7 @@ setup(name='threadArt',
           'Programming Language :: Python :: 3',
       ],
       install_requires=[
-          "pillow",
           "numpy",
-          "scikit-image",
           "opencv-python"
       ]
       )

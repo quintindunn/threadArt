@@ -1,34 +1,44 @@
-if __name__ == "__main__":
-    import logging
-    import sys
-    from PIL import Image
-    from threadArt import process_image
+import logging
+import sys
 
-    image_path = "./horse.jpg"
-    width = 4000
-    pixel_size = 1
-    number_of_nails = 288
-    max_strings = 4000
-    nail_skip = 20
+import cv2 as cv
 
-    progress_reports = 200  # After how many lines to print a progress report, 0 to never.
-    use_visualizer = True
+from threadArt import KasperMeertsAlgorithm
 
-    settings = {
-        "Width": width,
-        "Pixel Size": pixel_size,
-        "Number of Nails": number_of_nails,
-        "Max Strings": max_strings,
-        "Nail Skip": nail_skip
-    }
+if __name__ == '__main__':
+    logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
+    test_file_dir = "./test/"
+    test_files = [
+        "cat.jpg",
+        "dog.jpg",
+        "goat.jpg",
+        "horse.jpg",
+        "pig.jpg",
+        "stella.jpg"
+    ]
 
-    for k, v in settings.items():
-        print(f"{k}: {v}")
+    for file in test_files:
+        file = test_file_dir + file
+        im = cv.imread(file)
 
-    im = Image.open(image_path)
-    seq, im = process_image(im=im, board_width=width, pixel_width=pixel_size, nail_count=number_of_nails,
-                            max_strings=max_strings, nails_skip=nail_skip, visualize=use_visualizer,
-                            progress=progress_reports)
+        art = KasperMeertsAlgorithm(
+            im=im,
+            n_pins=160,
+            max_lines=4000,
+            line_weight=20,
+            min_distance=20,
+            min_loop=20,
+            use_visualizer=True
+        )
+        sequence = art.run()
+        im = art.visualizer.im
 
-    print(*seq, sep=", ")
-    im.show()
+        *prev, _ = file.split(".")
+        final = f"{'.'.join(prev)}-sequence.txt"
+
+        with open(final, 'w') as f:
+            f.write(','.join(map(str, sequence)))
+
+        *prev, ending = file.split(".")
+        final = f"{'.'.join(prev)}-string.{ending}"
+        cv.imwrite(final, im)
