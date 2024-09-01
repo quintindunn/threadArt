@@ -1,1 +1,1 @@
-from .thread_art import HalfmontyAlgorithm
+from .thread_art import KasperMeertsAlgorithm
