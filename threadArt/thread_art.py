@@ -127,7 +127,7 @@ class KasperMeertsAlgorithm:
                 diff = img_result - self.im
                 mul = np.uint8(img_result < self.im) * 254 + 1
                 abs_diff = diff * mul
-                err = abs_diff.sum() / length*length
+                err = abs_diff.sum() / (length*length)
 
                 if self.optimal is not None:
                     self.optimal = err, line if err < self.optimal[0] else self.optimal
